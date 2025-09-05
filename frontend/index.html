@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Email Assistant - Dashboard</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root {
+    --primary:#4361ee; --secondary:#3f37c9; --success:#4cc9f0; --danger:#f72585;
+    --warning:#f8961e; --info:#4895ef; --light:#f8f9fa; --dark:#212529;
+}
+body {background-color:#f5f7fb; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;}
+.sidebar {background: linear-gradient(to bottom,var(--primary),var(--secondary)); color:white; height:100vh; position:fixed; padding-top:60px;}
+.main-content {margin-left:250px; padding:20px;}
+.card {border-radius:10px; box-shadow:0 4px 10px rgba(0,0,0,0.1); margin-bottom:20px; border:none; transition: transform 0.3s;}
+.card:hover {transform:translateY(-5px);}
+.email-item {border-left:4px solid transparent; transition:all 0.3s;}
+.email-item:hover {background-color:#f8f9fa; border-left:4px solid var(--primary);}
+.priority-high{border-left:4px solid var(--danger)!important;}
+.priority-medium{border-left:4px solid var(--warning)!important;}
+.priority-low{border-left:4px solid var(--success)!important;}
+.sentiment-negative{color:var(--danger);}
+.sentiment-positive{color:var(--success);}
+.sentiment-neutral{color:var(--info);}
+.nav-link {color:rgba(255,255,255,0.8); border-radius:5px; margin:5px 0; padding:10px 15px;}
+.nav-link:hover, .nav-link.active{background-color:rgba(255,255,255,0.1); color:white;}
+.stats-card{text-align:center; padding:15px;}
+.stats-number{font-size:2rem; font-weight:bold;}
+.email-action-btn{margin-right:5px;}
+.response-box{background-color:#f8f9fa; border-radius:5px; padding:15px; margin-top:15px;}
+.connection-status{position:fixed; bottom:20px; right:20px; z-index:1000;}
+.processing-indicator{display:inline-block; width:12px; height:12px; border-radius:50%; background-color:var(--success); margin-right:5px; animation:pulse 1.5s infinite;}
+@keyframes pulse {0%{opacity:1;}50%{opacity:0.4;}100%{opacity:1;}}
+.toast-container{position:fixed; top:20px; right:20px; z-index:1000;}
+.real-time-badge{animation:blink 2s infinite;}
+@keyframes blink {0%{opacity:1;}50%{opacity:0.6;}100%{opacity:1;}}
+@media(max-width:768px){.sidebar{display:none;}.main-content{margin-left:0;}}
+</style>
+</head>
+<body>
+<div class="container-fluid">
+<div class="row">
+<!-- Sidebar -->
+<div class="col-md-2 sidebar d-none d-md-block">
+    <h3 class="text-center mb-4">AI Mail Assistant</h3>
+    <ul class="nav flex-column">
+        <li class="nav-item"><a class="nav-link active" href="#"><i class="fas fa-tachometer-alt me-2"></i> Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="inbox.html"><i class="fas fa-inbox me-2"></i> Inbox</a></li>
+        <li class="nav-item"><a class="nav-link" href="#"><i class="fas fa-chart-bar me-2"></i> Analytics</a></li>
+        <li class="nav-item"><a class="nav-link" href="#"><i class="fas fa-cog me-2"></i> Settings</a></li>
+    </ul>
+</div>
+
+<!-- Main Content -->
+<div class="col-md-10 main-content">
+<header class="d-flex justify-content-between align-items-center mb-4">
+    <h2>AI-Powered Communication Assistant <span class="badge bg-info real-time-badge">Real-Time</span></h2>
+    <div>
+        <button class="btn btn-primary" id="fetchEmailsBtn"><i class="fas fa-sync-alt me-2"></i> Fetch Emails</button>
+        <button class="btn btn-outline-secondary ms-2" id="simulateBtn"><i class="fas fa-bolt me-2"></i> Simulate Incoming</button>
+    </div>
+</header>
+
+<!-- Stats -->
+<div class="row mb-4">
+    <div class="col-md-3"><div class="card stats-card"><div class="card-body"><i class="fas fa-envelope text-primary fa-2x mb-2"></i><h5>Total Emails</h5><p class="stats-number" id="totalEmails">0</p></div></div></div>
+    <div class="col-md-3"><div class="card stats-card"><div class="card-body"><i class="fas fa-check-circle text-success fa-2x mb-2"></i><h5>Resolved</h5><p class="stats-number" id="resolvedEmails">0</p></div></div></div>
+    <div class="col-md-3"><div class="card stats-card"><div class="card-body"><i class="fas fa-exclamation-circle text-warning fa-2x mb-2"></i><h5>Pending</h5><p class="stats-number" id="pendingEmails">0</p></div></div></div>
+    <div class="col-md-3"><div class="card stats-card"><div class="card-body"><i class="fas fa-fire text-danger fa-2x mb-2"></i><h5>Urgent</h5><p class="stats-number" id="urgentEmails">0</p></div></div></div>
+</div>
+
+<!-- Charts -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card"><div class="card-header bg-white"><h5>Email Categories</h5></div>
+        <div class="card-body"><canvas id="categoryChart" height="250"></canvas></div></div>
+    </div>
+    <div class="col-md-6">
+        <div class="card"><div class="card-header bg-white"><h5>Sentiment Analysis</h5></div>
+        <div class="card-body"><canvas id="sentimentChart" height="250"></canvas></div></div>
+    </div>
+</div>
+
+<!-- Email Table -->
+<div class="card">
+    <div class="card-header bg-white"><h5>Inbox Emails</h5></div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" id="emailTable">
+                <thead class="table-light">
+                    <tr>
+                        <th>From</th>
+                        <th>Subject</th>
+                        <th>Received</th>
+                        <th>Sentiment</th>
+                        <th>Priority</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Email Detail -->
+<div class="card mt-4" id="emailDetailCard" style="display:none;">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5>Email Details</h5>
+        <button class="btn btn-sm btn-outline-secondary" id="closeDetailBtn"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="card-body">
+        <h6 id="emailSubject"></h6>
+        <p class="text-muted"><i class="fas fa-user me-1"></i> <span id="emailFrom"></span> | <i class="fas fa-clock me-1"></i> <span id="emailTime"></span></p>
+        <div id="emailBody" class="mb-3"></div>
+        <h6>AI-Generated Response</h6>
+        <div class="response-box" id="aiResponse">[AI response will appear here]</div>
+        <div class="mt-3">
+            <button class="btn btn-success" id="sendResponseBtn"><i class="fas fa-paper-plane me-2"></i> Send Response</button>
+            <button class="btn btn-outline-primary ms-2" id="editResponseBtn"><i class="fas fa-edit me-2"></i> Edit Response</button>
+            <button class="btn btn-outline-secondary ms-2" id="discardResponseBtn"><i class="fas fa-times me-2"></i> Discard</button>
+        </div>
+    </div>
+</div>
+</div>
+</div>
+
+<div class="toast-container"></div>
+
+<script>
+// Global chart objects
+let categoryChart, sentimentChart;
+
+// Initialize charts
+document.addEventListener('DOMContentLoaded', () => {
+    const catCtx = document.getElementById('categoryChart').getContext('2d');
+    categoryChart = new Chart(catCtx, {
+        type:'doughnut',
+        data:{labels:['Technical','Billing','Feature Request','General'], datasets:[{data:[0,0,0,0], backgroundColor:['#4361ee','#f72585','#4cc9f0','#f8961e']}]},
+        options:{responsive:true, plugins:{legend:{position:'right'}}}
+    });
+
+    const sentCtx = document.getElementById('sentimentChart').getContext('2d');
+    sentimentChart = new Chart(sentCtx, {
+        type:'bar',
+        data:{labels:['Negative','Neutral','Positive'], datasets:[{label:'Email Sentiment', data:[0,0,0], backgroundColor:['#f72585','#4cc9f0','#4bb543']}]},
+        options:{responsive:true, scales:{y:{beginAtZero:true, title:{display:true, text:'Number of Emails'}}}}
+    });
+});
+
+// Toast helper
+function showToast(msg,type='info'){
+    const container = document.querySelector('.toast-container');
+    const t = document.createElement('div');
+    t.className = `toast align-items-center text-white bg-${type} border-0`;
+    t.innerHTML = `<div class="d-flex"><div class="toast-body">${msg}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>`;
+    container.appendChild(t);
+    new bootstrap.Toast(t).show();
+    t.addEventListener('hidden.bs.toast',()=>t.remove());
+}
+
+// Fetch emails and update table + charts
+async function fetchEmailsFromBackend(){
+    showToast('Fetching emails...','info');
+    try{
+        const res = await fetch('http://localhost:8000/fetch-emails');
+        const data = await res.json();
+        if(data.error){ showToast(data.error,'danger'); window.location.href='login.html'; return; }
+
+        const tbody = document.querySelector('#emailTable tbody');
+        tbody.innerHTML='';
+
+        let categoryCounts = { 'Technical':0, 'Billing':0, 'Feature Request':0, 'General':0 };
+        let sentimentCounts = { 'Negative':0, 'Neutral':0, 'Positive':0 };
+
+        data.emails.forEach(email=>{
+            const categories=['Technical','Billing','Feature Request','General'];
+            const sentiments=['Negative','Neutral','Positive'];
+            const category = categories[Math.floor(Math.random()*categories.length)];
+            const sentiment = sentiments[Math.floor(Math.random()*sentiments.length)];
+
+            categoryCounts[category]++;
+            sentimentCounts[sentiment]++;
+
+            const row=document.createElement('tr');
+            row.className='email-item ' + (category==='Technical'?'priority-high':'priority-low');
+            row.innerHTML=`<td>${email.from}</td><td>${email.subject}</td><td>${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</td><td><span class="sentiment-${sentiment.toLowerCase()}"><i class="fas fa-${sentiment==='Positive'?'smile':(sentiment==='Negative'?'frown':'meh')}"></i> ${sentiment}</span></td><td><span class="badge bg-${category==='Technical'?'danger':'info'}">${category}</span></td><td><button class="btn btn-sm btn-primary view-email">View</button></td>`;
+            tbody.appendChild(row);
+
+            row.querySelector('.view-email').addEventListener('click',()=>{
+                document.getElementById('emailDetailCard').style.display='block';
+                document.getElementById('emailSubject').textContent=email.subject;
+                document.getElementById('emailFrom').textContent=email.from;
+                document.getElementById('emailTime').textContent=new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                document.getElementById('emailBody').textContent=email.snippet;
+                document.getElementById('aiResponse').textContent="[AI-generated response will appear here]";
+            });
+        });
+
+        document.getElementById('totalEmails').textContent = data.emails.length;
+        document.getElementById('pendingEmails').textContent = data.emails.length;
+
+        categoryChart.data.datasets[0].data = Object.values(categoryCounts);
+        categoryChart.update();
+        sentimentChart.data.datasets[0].data = Object.values(sentimentCounts);
+        sentimentChart.update();
+
+        showToast(`Fetched ${data.emails.length} emails and updated charts`,'success');
+    }catch(err){ console.error(err); showToast('Error fetching emails','danger'); }
+}
+
+document.getElementById('fetchEmailsBtn').addEventListener('click', fetchEmailsFromBackend);
+document.getElementById('simulateBtn').addEventListener('click',()=>{ showToast('Simulated incoming email','info'); });
+document.getElementById('closeDetailBtn').addEventListener('click',()=>{document.getElementById('emailDetailCard').style.display='none';});
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
